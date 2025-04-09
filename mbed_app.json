@@ -1,0 +1,12 @@
+{
+    "target_overrides": {
+        "LPC1768": {
+            "target.components_add": ["SD"],
+            "sd.SPI_MOSI": "p5",
+            "sd.SPI_MISO": "p6",
+            "sd.SPI_CLK": "p7",
+            "sd.SPI_CS": "p8",
+            "sd.INIT_FREQUENCY": 160000
+        }
+    }
+}

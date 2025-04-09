@@ -1,153 +1,119 @@
 #include "mbed.h"
-#include "SDFileSystem.h"  // SD card library
-#include "VS1053.h"        // MP3 decoder library
-#include "uLCD.hpp"        // Display library
+#include "SDBlockDevice.h"
+#include "FATFileSystem.h"
+#include "VS1053.h"
 
-// ----- Peripheral Configuration -----
-// Adjust the pin names based on your hardware wiring
-// SPI pins for VS1053 and SDCard:
-#define SPI_MOSI  p11
-#define SPI_MISO  p12
-#define SPI_SCK   p13
+using namespace std::chrono_literals;
 
-// Chip selects for VS1053 and SD card:
-#define MP3_CS    p8   // VS1053 control chip select
-#define MP3_DCS   p9   // VS1053 data chip select (bsync in the library)
-#define SD_CS     p10  // SD card chip select
+// === VS1053 Setup (shared SPI) ===
+#define VS_CS   p14
+#define VS_DREQ p16
+#define VS_RST  p17
 
-// Other VS1053 control pins:
-#define MP3_DREQ  p14
-#define MP3_RST   p15
+VS1053 vs1053(p11, p12, p13, VS_CS, VS_CS, VS_DREQ, VS_RST);
 
-// uLCD pins:
-#define LCD_TX    p16
-#define LCD_RX    p17
-#define LCD_RST   p18
+// === SD Card Setup (shared SPI bus) ===
+// Create an SDBlockDevice object for the SD card
+SDBlockDevice sd(p5, p6, p7, p8);
+// Mount the SD card using a FATFileSystem, accessible at the mount point "/sd"
+FATFileSystem fs("sd");
 
-// Control buttons & analog input
-InterruptIn playPauseBtn(p19);
-AnalogIn volumePot(p20);             // Reads voltage 0.0-1.0 (Mbed ADC)
-InterruptIn audioSwitchBtn(p21);     // To toggle between outputs
-DigitalOut audioSwitchCtrl(p22);     // Drives an external switching circuit
+// === Controls ===
+AnalogIn volumePot(p19);
+DigitalIn playPauseBtn(p21, PullUp);
+DigitalIn nextBtn(p22, PullUp);
+DigitalIn prevBtn(p23, PullUp);
 
-// SD card object; the name "sd" is used to open files (e.g. "/sd/song.mp3")
-SDFileSystem sd(SPI_MOSI, SPI_MISO, SPI_SCK, SD_CS, "sd");
+// === State ===
+bool playing = true;
 
-// VS1053 instance (SPI pins and control pins)
-// You may pass a custom SPI frequency if needed.
-VS1053 mp3(SPI_MOSI, SPI_MISO, SPI_SCK, MP3_CS, MP3_DCS, MP3_DREQ, MP3_RST);
-
-// uLCD instance with a selected baud rate
-uLCD display(LCD_TX, LCD_RX, LCD_RST, uLCD::BAUD_115200);
-
-// Global flags
-volatile bool playing = false;      // Tracks play/pause state
-volatile bool audioToSpeaker = false; // false: headphone; true: speaker
-
-// --- Interrupt Callbacks ---
-// Called when the play/pause button is pressed
-void togglePlayPause() {
-    playing = !playing;
-    // For feedback, you can update the display
-    display.cls();
-    display.printf("Play: %s\n", playing ? "ON" : "PAUSED");
+// === Helper: Volume Control ===
+void updateVolume() {
+    float level = volumePot.read();
+    uint8_t vol = static_cast<uint8_t>(255 * (1.0f - level));
+    vs1053.setVolume(vol);
+    printf("[Volume] Set to %d (analog: %.2f)\n", vol, level);
 }
 
-// Called when the audio switch button is pressed
-void toggleAudioOutput() {
-    // Toggle the digital output that controls your external audio switching circuit.
-    audioToSpeaker = !audioToSpeaker;
-    audioSwitchCtrl = audioToSpeaker ? 1 : 0;
-    // Update display with the current output
-    display.locate(0, 20);
-    display.printf("Output: %s", audioToSpeaker ? "Speaker" : "Headphones");
-}
-
-// --- Helper function: Map ADC reading to volume ----
-// Here we assume the VS1053 volume register takes 16 bits (two 8-bit values)
-// where lower numbers mean higher volume. For example, you may want 0xFEFE (quiet)
-// at the low end and 0x0000 (max) at the high end. Adjust the mapping per your chip’s datasheet.
-uint8_t mapVolume(float potValue) {
-    // potValue will be in the range 0.0 (min) to 1.0 (max)
-    // Choose a mapping as needed; here, 0.0 -> volume 0xFF (min) and 1.0 -> volume 0x00 (max)
-    uint8_t vol = (uint8_t)((1.0f - potValue) * 255.0f);
-    return vol;
-}
-
-// --- Audio streaming function ---
-// This function demonstrates reading an MP3 file in blocks and sending data to the VS1053.
-// In a real design, you would likely run this in a separate thread (or use nonblocking I/O) so that
-// you can update volume and check for play/pause without interruption.
-void playMP3(const char *filename) {
-    FILE *fp = fopen(filename, "rb");
+// === Playback Logic ===
+void playMP3(const char* filename) {
+    printf("[INFO] Trying to open: %s\n", filename);
+    FILE* fp = fopen(filename, "rb");
     if (!fp) {
-        display.cls();
-        display.printf("Error opening file");
+        printf("[ERROR] Cannot open file: %s\n", filename);
         return;
     }
-    
-    // Display song name extracted from filename (or use metadata if available)
-    display.cls();
-    display.printf("Playing:\n%s", filename);
-    
-    char buffer[32]; // Block size for sending data (match the library’s sendDataBlock, 32 bytes per batch)
+
+    printf("[INFO] Opened file successfully!\n");
+
+    playing = true;
+    char buffer[512];
     size_t bytesRead;
-    
-    // Reset the VS1053 before playing:
-    mp3.hardwareReset();
-    mp3.clockUp();
-    
-    // Main streaming loop:
-    while (!feof(fp)) {
-        // If paused, halt streaming (you may want to sleep for a short time)
-        while (!playing) {
-            wait_ms(100);
+    int blockCount = 0;
+
+    while (playing && (bytesRead = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
+        vs1053.sendDataBlock(buffer, bytesRead);
+        updateVolume();
+        blockCount++;
+
+        if (blockCount % 10 == 0) {
+            printf("[INFO] Playing block %d...\n", blockCount);
         }
-        
-        // Optionally, update volume continuously
-        uint8_t vol = mapVolume(volumePot.read());
-        mp3.setVolume(vol);
-        
-        // Read a block of data from the file
-        bytesRead = fread(buffer, 1, sizeof(buffer), fp);
-        if (bytesRead > 0) {
-            // Send the data block to the VS1053; this call blocks until the chip is ready.
-            mp3.sendDataBlock(buffer, bytesRead);
+
+        if (playPauseBtn == 0) {
+            ThisThread::sleep_for(200ms);
+            playing = false;
+            printf("[INFO] Playback paused by button.\n");
+            break;
         }
     }
-    
+
     fclose(fp);
+    printf("[INFO] Finished playback after %d blocks.\n", blockCount);
 }
 
 int main() {
-    // Initialize display
-    display.cls();
-    display.printf("MP3 Player Init\n");
-    
-    // Configure pushbuttons with interrupts; set pull-ups if needed
-    playPauseBtn.mode(PullUp);
-    playPauseBtn.fall(callback(togglePlayPause));   // assuming active low button
-    
-    audioSwitchBtn.mode(PullUp);
-    audioSwitchBtn.fall(callback(toggleAudioOutput));
-    
-    // Set initial state
-    playing = true;         // Auto-play on start; press play/pause to toggle
-    audioSwitchCtrl = 0;      // Start with headphones output (adjust as needed)
-    
-    // Give a short startup delay for peripherals to stabilize.
-    wait_ms(500);
-    
-    // List files (not shown) or simply hardcode a file name.
-    // For this example, assume you have a file "/sd/song.mp3"
-    const char *songFilename = "/sd/song.mp3";
-    
-    // Start playing the song
-    playMP3(songFilename);
-    
-    // Optionally, you could loop to allow selecting another file.
-    while (1) {
-        // In a full design you may allow file browsing, etc.
-        wait_ms(1000);
+    printf("\n=== MP3 Player Boot ===\n");
+
+    // Initialize VS1053
+    printf("[INFO] Resetting VS1053...\n");
+    vs1053.hardwareReset();
+    vs1053.modeSwitch();
+    vs1053.clockUp();
+    printf("[INFO] VS1053 initialized.\n");
+
+    ThisThread::sleep_for(500ms);
+
+    // Mount the SD Card filesystem
+    printf("[INFO] Mounting SD card filesystem...\n");
+    int err = fs.mount(&sd);
+    if (err) {
+        printf("[ERROR] Filesystem mount failed with error: %d\n", err);
+        // Optional: reformat the SD card if mounting fails:
+        // err = fs.reformat(&sd);
+        // if (err) {
+        //     printf("[ERROR] Reformat failed with error: %d\n", err);
+        //     return -1;
+        // }
+    } else {
+        printf("[INFO] Filesystem mounted successfully.\n");
+    }
+
+    // Verify the mount point is accessible by attempting to open the directory
+    DIR* d = opendir("/sd");
+    if (!d) {
+        printf("[ERROR] SD card directory not found!\n");
+    } else {
+        printf("[INFO] SD card directory detected.\n");
+        closedir(d);
+    }
+
+    updateVolume();
+
+    printf("[INFO] Starting playback...\n");
+    playMP3("/sd/track01.mp3");
+
+    while (true) {
+        ThisThread::sleep_for(500ms);
     }
 }
