@@ -2,153 +2,165 @@
 #include "SDBlockDevice.h"
 #include "FATFileSystem.h"
 #include "VS1053.h"
+#include <vector>
+#include <string>
+#include <cstdio> 
+#include <cstdint> 
 
-using namespace std::chrono_literals;
-
-// === VS1053 Setup (shared SPI) ===
-VS1053 vs1053(p11, p12, p13, p14, p15, p16, p17);  // SPI + VS1053 control pins
-
-// === SD Card Setup (shared SPI) ===
-SDBlockDevice sd(p5, p6, p7, p8);  // SPI + CS
+// Hardware Configuration
+VS1053 audio(p11, p12, p13, p14, p15, p16, p17); // SPI pins + control
+SDBlockDevice sd(p5, p6, p7, p8);                // SPI pins + CS
 FATFileSystem fs("sd");
 
-// === Controls ===
-AnalogIn volumePot(p19);
-DigitalIn playPauseBtn(p21, PullUp);
-DigitalIn nextBtn(p22, PullUp);
-DigitalIn prevBtn(p23, PullUp);
+// User Controls
+AnalogIn volumeKnob(p19);
+DigitalIn playButton(p21, PullUp);
+DigitalIn nextButton(p22, PullUp);
+DigitalIn prevButton(p23, PullUp);
 
-// === Global Playback Data ===
-// We use a static variable to hold the resume offset across playbacks.
-static long resumeOffset = 0;
+// Player State
+std::vector<std::string> tracks;
+int currentTrack = 0;
+bool trackChanged = true;
+bool isPaused = false;
+uint32_t resumePosition = 0;
 
-// === Helper: Volume Control ===
-void updateVolume() {
-    float level = volumePot.read();
-    uint8_t vol = static_cast<uint8_t>(255 * (1.0f - level));
-    uint8_t percent = static_cast<uint8_t>(100 * level);
-    vs1053.setVolume(vol);
-    printf("[Volume] Set to %d%%\n", percent);
-}
-
-// === Playback Logic with Pause/Resume Support ===
-// This function opens the file, seeks to the resumeOffset if any, and plays it block-by-block.
-// Pressing the play/pause button toggles a "paused" state.
-// When pausing, we save the current file position so that playback may resume from this point.
-void playMP3(const char* filename) {
-    printf("[INFO] Trying to open: %s\n", filename);
-    FILE* fp = fopen(filename, "rb");
-    if (!fp) {
-        printf("[ERROR] Cannot open file: %s\n", filename);
+void initializePlayer() {
+    // Reset and configure VS1053
+    audio.hardwareReset();
+    ThisThread::sleep_for(100ms);
+    audio.modeSwitch();
+    audio.clockUp();
+    
+    // Set initial volume
+    uint8_t vol = static_cast<uint8_t>(255 * (1.0f - volumeKnob.read()));
+    audio.setVolume(vol);
+    
+    // Configure SD card
+    sd.frequency(4000000); // 4MHz
+    if (fs.mount(&sd)) {
+        printf("SD Card Mount Failed!\n");
         return;
     }
     
-    // If resuming from an earlier pause, seek to the saved offset.
-    if (resumeOffset > 0) {
-        fseek(fp, resumeOffset, SEEK_SET);
-        printf("[INFO] Resuming from file offset: %ld\n", resumeOffset);
-    } else {
-        printf("[INFO] Starting playback from beginning.\n");
+    // Load MP3 files
+    DIR *dir = opendir("/sd");
+    if (dir) {
+        struct dirent *ent;
+        while ((ent = readdir(dir)) != nullptr) {
+            std::string filename = ent->d_name;
+            if (filename.length() > 4 && 
+                filename.substr(filename.length() - 4) == ".mp3") {
+                tracks.push_back("/sd/" + filename);
+                printf("Found: %s\n", filename.c_str());
+            }
+        }
+        closedir(dir);
+    }
+}
+
+void playCurrentTrack() {
+    if (tracks.empty()) return;
+    
+    FILE *file = fopen(tracks[currentTrack].c_str(), "rb");
+    if (!file) {
+        printf("Failed to open: %s\n", tracks[currentTrack].c_str());
+        return;
     }
 
-    bool paused = false;   // Playback state flag: false = playing, true = paused.
-    char buffer[512];
+    printf("Now Playing: %s\n", tracks[currentTrack].c_str());
+    
+    // Set file position
+    if (trackChanged) {
+        fseek(file, 0, SEEK_SET);
+        resumePosition = 0;
+    } else {
+        fseek(file, resumePosition, SEEK_SET);
+    }
+
+    char buffer[32];
     size_t bytesRead;
-    int blockCount = 0;
+    uint32_t updateCounter = 0;
 
     while (true) {
-        // Check if play/pause button is pressed to toggle pause/resume
-        if (playPauseBtn == 0) {
-            // Simple debounce delay
+        // Check for button presses
+        if (!playButton) {
             ThisThread::sleep_for(200ms);
-            // Toggle paused state
-            paused = !paused;
-            if (paused) {
-                // Save current position before pausing.
-                resumeOffset = ftell(fp);
-                printf("[INFO] Playback paused at block %d, file offset: %ld.\n", blockCount, resumeOffset);
+            isPaused = !isPaused;
+            if (isPaused) {
+                resumePosition = ftell(file);
+                printf("Paused at position: %u\n", resumePosition);
             } else {
-                printf("[INFO] Resuming playback at block %d, file offset: %ld.\n", blockCount, resumeOffset);
+                printf("Resuming playback\n");
             }
-            // Wait until the button is released to avoid bouncing.
-            while (playPauseBtn == 0) {
-                ThisThread::sleep_for(50ms);
-            }
+            while (!playButton) ThisThread::sleep_for(50ms);
         }
 
-        // If paused, simply wait here until resumed.
-        if (paused) {
-            ThisThread::sleep_for(50ms);
-            continue;
+        if (!isPaused) {
+            // Check for track change requests
+            if (!nextButton || !prevButton) break;
+
+            // Read and play audio data
+            bytesRead = fread(buffer, 1, sizeof(buffer), file);
+            if (bytesRead == 0) break; // End of file
+            
+            audio.sendDataBlock(buffer, bytesRead);
         }
 
-        // Read a block of data from the file.
-        bytesRead = fread(buffer, 1, sizeof(buffer), fp);
-        if (bytesRead == 0) {
-            // End of file reached.
-            break;
-        }
-        
-        // Send the data block to the VS1053 decoder.
-        vs1053.sendDataBlock(buffer, bytesRead);
-        blockCount++;
-
-        // Update volume every 100 blocks.
-        if (blockCount % 100 == 0) {
-            updateVolume();
-        }
-        if (blockCount % 10 == 0) {
-            printf("[INFO] Playing block %d...\n", blockCount);
+        // Periodic updates
+        if (++updateCounter % 100 == 0) {
+            // Update volume
+            uint8_t vol = static_cast<uint8_t>(255 * (1.0f - volumeKnob.read()));
+            audio.setVolume(vol);
+            
+            // Small delay to prevent CPU overload
+            ThisThread::sleep_for(1ms);
         }
     }
 
-    fclose(fp);
-    // When playback reaches the end, reset resumeOffset.
-    resumeOffset = 0;
-    printf("[INFO] Finished playback after %d blocks.\n", blockCount);
+    fclose(file);
+    if (!trackChanged) {
+        // Only reset position if we finished normally
+        resumePosition = 0;
+    }
 }
 
 int main() {
-    printf("\n=== MP3 Player Boot ===\n");
-
-    // Initialize VS1053
-    printf("[INFO] Resetting VS1053...\n");
-    vs1053.hardwareReset();
-    vs1053.modeSwitch();
-    vs1053.clockUp();
-    vs1053.setSPIFrequency(8000000);  // Set VS1053 SPI to 8MHz
-    printf("[INFO] VS1053 initialized.\n");
-
-    ThisThread::sleep_for(500ms);
-
-    // Boost SD card frequency
-    printf("[INFO] Setting SD card SPI frequency...\n");
-    sd.frequency(4000000);  // Set SD SPI to 4MHz
-
-    // Mount the SD Card filesystem
-    printf("[INFO] Mounting SD card filesystem...\n");
-    int err = fs.mount(&sd);
-    if (err) {
-        printf("[ERROR] Filesystem mount failed with error: %d\n", err);
-    } else {
-        printf("[INFO] Filesystem mounted successfully.\n");
+    printf("\n=== MP3 Player Initializing ===\n");
+    
+    initializePlayer();
+    if (tracks.empty()) {
+        printf("No MP3 files found!\n");
+        return 1;
     }
 
-    DIR* d = opendir("/sd");
-    if (!d) {
-        printf("[ERROR] SD card directory not found!\n");
-    } else {
-        printf("[INFO] SD card directory detected.\n");
-        closedir(d);
-    }
-
-    updateVolume();
-
-    printf("[INFO] Starting playback...\n");
-    playMP3("/sd/track01.mp3");
-
-    // Main thread idle loop.
+    printf("\n=== Ready to Play ===\n");
+    
     while (true) {
-        ThisThread::sleep_for(500ms);
+        if (trackChanged) {
+            audio.hardwareReset();
+            ThisThread::sleep_for(100ms);
+            audio.modeSwitch();
+            audio.clockUp();
+            trackChanged = false;
+        }
+
+        playCurrentTrack();
+
+        // Handle track navigation
+        if (!nextButton) {
+            ThisThread::sleep_for(200ms);
+            currentTrack = (currentTrack + 1) % tracks.size();
+            trackChanged = true;
+            while (!nextButton) ThisThread::sleep_for(50ms);
+        }
+        else if (!prevButton) {
+            ThisThread::sleep_for(200ms);
+            currentTrack = (currentTrack - 1 + tracks.size()) % tracks.size();
+            trackChanged = true;
+            while (!prevButton) ThisThread::sleep_for(50ms);
+        }
+
+        ThisThread::sleep_for(50ms);
     }
 }
