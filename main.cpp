@@ -6,16 +6,10 @@
 using namespace std::chrono_literals;
 
 // === VS1053 Setup (shared SPI) ===
-#define VS_CS   p14
-#define VS_DREQ p16
-#define VS_RST  p17
+VS1053 vs1053(p11, p12, p13, p14, p15, p16, p17);  // SPI + VS1053 control pins
 
-VS1053 vs1053(p11, p12, p13, VS_CS, VS_CS, VS_DREQ, VS_RST);
-
-// === SD Card Setup (shared SPI bus) ===
-// Create an SDBlockDevice object for the SD card
-SDBlockDevice sd(p5, p6, p7, p8);
-// Mount the SD card using a FATFileSystem, accessible at the mount point "/sd"
+// === SD Card Setup (shared SPI) ===
+SDBlockDevice sd(p5, p6, p7, p8);  // SPI + CS
 FATFileSystem fs("sd");
 
 // === Controls ===
@@ -53,8 +47,11 @@ void playMP3(const char* filename) {
 
     while (playing && (bytesRead = fread(buffer, 1, sizeof(buffer), fp)) > 0) {
         vs1053.sendDataBlock(buffer, bytesRead);
-        updateVolume();
         blockCount++;
+
+        if (blockCount % 100 == 0) {
+            updateVolume();
+        }
 
         if (blockCount % 10 == 0) {
             printf("[INFO] Playing block %d...\n", blockCount);
@@ -80,26 +77,24 @@ int main() {
     vs1053.hardwareReset();
     vs1053.modeSwitch();
     vs1053.clockUp();
+    vs1053.setSPIFrequency(8000000);  // << Set VS1053 SPI to 8MHz
     printf("[INFO] VS1053 initialized.\n");
 
     ThisThread::sleep_for(500ms);
+
+    // Boost SD card frequency
+    printf("[INFO] Setting SD card SPI frequency...\n");
+    sd.frequency(4000000);  // << Set SD SPI to 4MHz
 
     // Mount the SD Card filesystem
     printf("[INFO] Mounting SD card filesystem...\n");
     int err = fs.mount(&sd);
     if (err) {
         printf("[ERROR] Filesystem mount failed with error: %d\n", err);
-        // Optional: reformat the SD card if mounting fails:
-        // err = fs.reformat(&sd);
-        // if (err) {
-        //     printf("[ERROR] Reformat failed with error: %d\n", err);
-        //     return -1;
-        // }
     } else {
         printf("[INFO] Filesystem mounted successfully.\n");
     }
 
-    // Verify the mount point is accessible by attempting to open the directory
     DIR* d = opendir("/sd");
     if (!d) {
         printf("[ERROR] SD card directory not found!\n");
