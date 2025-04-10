@@ -25,8 +25,9 @@ bool playing = true;
 void updateVolume() {
     float level = volumePot.read();
     uint8_t vol = static_cast<uint8_t>(255 * (1.0f - level));
+    uint8_t percent = static_cast<uint8_t>(100*level);
     vs1053.setVolume(vol);
-    printf("[Volume] Set to %d (analog: %.2f)\n", vol, level);
+    printf("[Volume] Set to %d%%\n", percent);
 }
 
 // === Playback Logic ===
