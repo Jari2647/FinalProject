@@ -28,19 +28,34 @@ bool isPaused = false;
 uint32_t resumePosition = 0;
 
 // Constants
-const int BAR_WIDTH = 128;         // uLCD width
+const int BAR_WIDTH = 128;
 const int BAR_HEIGHT = 4;
-const int BAR_Y = 72;              // ~9 lines down (6 title + 2 spacing)
-
-const int BITRATE_BYTES_PER_SEC = 16000; // ~128 kbps
+const int BAR_Y = 72;
+const int BITRATE_BYTES_PER_SEC = 16000; // Approx for 128 kbps MP3
 
 void drawProgressBar(float percent) {
     int filled = static_cast<int>(percent * BAR_WIDTH);
-    uLCD.filled_rectangle(0, BAR_Y - BAR_HEIGHT, BAR_WIDTH, BAR_Y, BLACK);  // clear bar
+    uLCD.filled_rectangle(0, BAR_Y - BAR_HEIGHT, BAR_WIDTH, BAR_Y, BLACK);  // clear
     uLCD.filled_rectangle(0, BAR_Y - BAR_HEIGHT, filled, BAR_Y, GREEN);
 }
 
-void displayTrackTitle(const std::string& path, int durationSec) {
+void updateTrackCountDisplay() {
+    uLCD.locate(0, 0); // Top-left
+    uLCD.color(WHITE);
+    uLCD.printf("Track %d/%d", currentTrack + 1, tracks.size());
+}
+
+void updatePlayPauseStatus() {
+    uLCD.locate(10, 0); // Top-right-ish (adjust based on screen)
+    uLCD.color(WHITE);
+    if (isPaused) {
+        uLCD.printf("Paused ");
+    } else {
+        uLCD.printf("Playing");
+    }
+}
+
+void displayTrackTitle(const std::string& path) {
     uLCD.cls();
 
     std::string title = path.substr(path.find_last_of("/") + 1);
@@ -52,6 +67,8 @@ void displayTrackTitle(const std::string& path, int durationSec) {
     uLCD.printf("%s", title.c_str());
 
     drawProgressBar(0.0f);
+    updateTrackCountDisplay();
+    updatePlayPauseStatus();
 }
 
 void initializePlayer() {
@@ -97,11 +114,10 @@ void playCurrentTrack() {
 
     fseek(file, 0, SEEK_END);
     long totalBytes = ftell(file);
-    int estimatedDurationSec = totalBytes / BITRATE_BYTES_PER_SEC;
     fseek(file, 0, SEEK_SET);
 
     if (trackChanged) {
-        displayTrackTitle(tracks[currentTrack], estimatedDurationSec);
+        displayTrackTitle(tracks[currentTrack]);
         resumePosition = 0;
         trackChanged = false;
     } else {
@@ -117,6 +133,7 @@ void playCurrentTrack() {
             ThisThread::sleep_for(200ms);
             isPaused = !isPaused;
             resumePosition = ftell(file);
+            updatePlayPauseStatus();
             while (!playButton) ThisThread::sleep_for(50ms);
         }
 
