@@ -7,6 +7,7 @@
 #include <string>
 #include <cstdio>
 #include <cstdint>
+#include <algorithm>
 
 // Hardware Configuration
 VS1053 audio(p11, p12, p13, p14, p15, p16, p17);
@@ -16,9 +17,12 @@ uLCD_4DGL uLCD(p28, p27, p20);  // TX, RX, RESET
 
 // User Controls
 AnalogIn volumeKnob(p19);
-DigitalIn playButton(p21, PullUp);
-DigitalIn nextButton(p22, PullUp);
-DigitalIn prevButton(p23, PullUp);
+DigitalIn navRight(p29, PullUp);   // Next track
+DigitalIn navLeft(p26, PullUp);    // Previous track
+DigitalIn navUp(p24, PullUp);      // Menu up
+DigitalIn navDown(p25, PullUp);    // Menu down
+DigitalIn navCenter(p30, PullUp);  // Menu select + Play/Pause
+DigitalIn menuButton(p21, PullUp); // Dedicated button to return to menu
 
 // Player State
 std::vector<std::string> tracks;
@@ -31,22 +35,23 @@ uint32_t resumePosition = 0;
 const int BAR_WIDTH = 128;
 const int BAR_HEIGHT = 4;
 const int BAR_Y = 72;
-const int BITRATE_BYTES_PER_SEC = 16000; // Approx for 128 kbps MP3
+const int BITRATE_BYTES_PER_SEC = 16000;
 
+// === UI Utilities ===
 void drawProgressBar(float percent) {
     int filled = static_cast<int>(percent * BAR_WIDTH);
-    uLCD.filled_rectangle(0, BAR_Y - BAR_HEIGHT, BAR_WIDTH, BAR_Y, BLACK);  // clear
+    uLCD.filled_rectangle(0, BAR_Y - BAR_HEIGHT, BAR_WIDTH, BAR_Y, BLACK);
     uLCD.filled_rectangle(0, BAR_Y - BAR_HEIGHT, filled, BAR_Y, GREEN);
 }
 
 void updateTrackCountDisplay() {
-    uLCD.locate(0, 0); // Top-left
+    uLCD.locate(0, 0);
     uLCD.color(WHITE);
     uLCD.printf("Track %d/%d", currentTrack + 1, tracks.size());
 }
 
 void updatePlayPauseStatus() {
-    uLCD.locate(10, 0); // Top-right-ish (adjust based on screen)
+    uLCD.locate(10, 0);
     uLCD.color(WHITE);
     if (isPaused) {
         uLCD.printf("Paused ");
@@ -57,10 +62,8 @@ void updatePlayPauseStatus() {
 
 void displayTrackTitle(const std::string& path) {
     uLCD.cls();
-
     std::string title = path.substr(path.find_last_of("/") + 1);
     if (title.length() > 20) title = title.substr(0, 20);
-
     int xPos = std::max(0, 8 - static_cast<int>(title.length() / 2));
     uLCD.locate(xPos, 6);
     uLCD.color(WHITE);
@@ -71,6 +74,55 @@ void displayTrackTitle(const std::string& path) {
     updatePlayPauseStatus();
 }
 
+// === Menu ===
+void displayMenu(int selectedIndex) {
+    uLCD.cls();
+    uLCD.color(WHITE);
+    uLCD.locate(1, 0);
+    uLCD.printf("Select a song:");
+    for (int i = 0; i < std::min((int)tracks.size(), 5); i++) {
+        std::string name = tracks[i].substr(tracks[i].find_last_of("/") + 1);
+        if (name.length() > 12) name = name.substr(0, 12);
+
+        uLCD.locate(1, i + 2);
+        if (i == selectedIndex) {
+            uLCD.color(GREEN);
+            uLCD.printf("> %s", name.c_str());
+        } else {
+            uLCD.color(WHITE);
+            uLCD.printf("  %s", name.c_str());
+        }
+    }
+}
+
+void selectTrackMenu() {
+    int selection = 0;
+    displayMenu(selection);
+
+    while (true) {
+        if (!navUp) {
+            selection = (selection - 1 + tracks.size()) % tracks.size();
+            displayMenu(selection);
+            ThisThread::sleep_for(200ms);
+            while (!navUp) ThisThread::sleep_for(20ms);
+        }
+        if (!navDown) {
+            selection = (selection + 1) % tracks.size();
+            displayMenu(selection);
+            ThisThread::sleep_for(200ms);
+            while (!navDown) ThisThread::sleep_for(20ms);
+        }
+        if (!navCenter) {
+            currentTrack = selection;
+            trackChanged = true;
+            while (!navCenter) ThisThread::sleep_for(20ms);
+            break;
+        }
+        ThisThread::sleep_for(50ms);
+    }
+}
+
+// === Initialization ===
 void initializePlayer() {
     uLCD.cls();
     uLCD.color(WHITE);
@@ -106,6 +158,7 @@ void initializePlayer() {
     }
 }
 
+// === Playback ===
 void playCurrentTrack() {
     if (tracks.empty()) return;
 
@@ -115,34 +168,54 @@ void playCurrentTrack() {
     fseek(file, 0, SEEK_END);
     long totalBytes = ftell(file);
     fseek(file, 0, SEEK_SET);
-
-    if (trackChanged) {
-        displayTrackTitle(tracks[currentTrack]);
-        resumePosition = 0;
-        trackChanged = false;
-    } else {
-        fseek(file, resumePosition, SEEK_SET);
-    }
+    fseek(file, resumePosition, SEEK_SET);
 
     char buffer[32];
     size_t bytesRead;
     uint32_t counter = 0;
 
     while (true) {
-        if (!playButton) {
+        // Return to menu if menu button is pressed
+        if (!menuButton) {
+            ThisThread::sleep_for(200ms);
+            fclose(file);
+            while (!menuButton) ThisThread::sleep_for(20ms);
+            selectTrackMenu();
+            displayTrackTitle(tracks[currentTrack]);
+            resumePosition = 0;
+            updatePlayPauseStatus();
+            break;
+        }
+
+        // Toggle play/pause with center button
+        if (!navCenter) {
             ThisThread::sleep_for(200ms);
             isPaused = !isPaused;
             resumePosition = ftell(file);
             updatePlayPauseStatus();
-            while (!playButton) ThisThread::sleep_for(50ms);
+            while (!navCenter) ThisThread::sleep_for(50ms);
         }
 
         if (!isPaused) {
-            if (!nextButton || !prevButton) break;
+            // Handle next/prev during playback
+            if (!navRight) {
+                ThisThread::sleep_for(200ms);
+                currentTrack = (currentTrack + 1) % tracks.size();
+                trackChanged = true;
+                fclose(file);
+                while (!navRight) ThisThread::sleep_for(50ms);
+                break;
+            } else if (!navLeft) {
+                ThisThread::sleep_for(200ms);
+                currentTrack = (currentTrack - 1 + tracks.size()) % tracks.size();
+                trackChanged = true;
+                fclose(file);
+                while (!navLeft) ThisThread::sleep_for(50ms);
+                break;
+            }
 
             bytesRead = fread(buffer, 1, sizeof(buffer), file);
             if (bytesRead == 0) break;
-
             audio.sendDataBlock(buffer, bytesRead);
         }
 
@@ -160,6 +233,7 @@ void playCurrentTrack() {
     if (!trackChanged) resumePosition = 0;
 }
 
+// === Main ===
 int main() {
     initializePlayer();
     if (tracks.empty()) {
@@ -169,28 +243,21 @@ int main() {
         return 1;
     }
 
+    // Only show menu once at the beginning
+    selectTrackMenu();
+
     while (true) {
         if (trackChanged) {
             audio.hardwareReset();
             ThisThread::sleep_for(100ms);
             audio.modeSwitch();
             audio.clockUp();
+            displayTrackTitle(tracks[currentTrack]);
+            resumePosition = 0;
+            trackChanged = false;
         }
 
         playCurrentTrack();
-
-        if (!nextButton) {
-            ThisThread::sleep_for(200ms);
-            currentTrack = (currentTrack + 1) % tracks.size();
-            trackChanged = true;
-            while (!nextButton) ThisThread::sleep_for(50ms);
-        } else if (!prevButton) {
-            ThisThread::sleep_for(200ms);
-            currentTrack = (currentTrack - 1 + tracks.size()) % tracks.size();
-            trackChanged = true;
-            while (!prevButton) ThisThread::sleep_for(50ms);
-        }
-
         ThisThread::sleep_for(50ms);
     }
 }
