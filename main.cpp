@@ -81,7 +81,7 @@ void displayTrackTitle(const std::string& path) {
 }
 
 // Song menu with control for multiple pages
-// There a 12 songs in a page, which fits well on the lcd
+// Theres 10 songs in a page, which fits well on the lcd
 void displayMenu(int selectedIndex) {
     uLCD.cls();
     uLCD.color(WHITE);
@@ -125,7 +125,7 @@ void selectTrackMenu() {
             selection = (selection - 1 + tracks.size()) % tracks.size();
             displayMenu(selection);
             // Call some sleeps so the mbed can keep up
-            // This makes the menu display a bit slow as it goes through all 12 songs
+            // This makes the menu display a bit slow as it goes through all 10 songs
             ThisThread::sleep_for(200ms);
             // Some delay to avoid double-inputs
             while (!navUp) ThisThread::sleep_for(20ms);
