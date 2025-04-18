@@ -37,7 +37,7 @@ const int BAR_WIDTH = 128;
 const int BAR_HEIGHT = 4;
 const int BAR_Y = 72;
 const int BITRATE_BYTES_PER_SEC = 16000;
-static const int ITEMS_PER_PAGE = 12;  // number of songs per page in menu
+static const int ITEMS_PER_PAGE = 10;  // number of songs per page in menu
 
 // Repeatedly called progress bar function
 void drawProgressBar(float percent) {
