@@ -66,6 +66,9 @@ Hardware Requirements
         This project uses 4 AA batteries in series with a barrel jack adapter.
         Shared between LPC1768, VS1053, uLCD, and MicroSD card breakout.
 
+![FinalProject drawio](https://github.com/user-attachments/assets/e8bb33ed-ddbe-485a-8b00-71e8525cdd5e)
+
+
 Issues
 
     Speaker: Our initial design approach would allow the user to switch between 3.5mm audio and an on-board speaker.
@@ -98,7 +101,7 @@ Improvements
 
 Similar project: The MP3 Player from Mbed's cookbook. https://os.mbed.com/cookbook/MP3-Player
 
-    Inspiration was taken from this project directly from Mbed's forums. This served as a template that ensured us that
+    Inspiration was taken from this project directly from Mbed's forums. This served as a template that ensure to us that
     we could build this project entirely with the parts we had in the lab and in our kits.
 
     We decided to improve on this project in 3 key ways:
