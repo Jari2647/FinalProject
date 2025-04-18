@@ -47,11 +47,11 @@ void drawProgressBar(float percent) {
 void updateTrackCountDisplay() {
     uLCD.locate(0, 0);
     uLCD.color(WHITE);
-    uLCD.printf("Track %d/%d", currentTrack + 1, tracks.size());
+    uLCD.printf("Song %d/%d", currentTrack + 1, tracks.size());
 }
 
 void updatePlayPauseStatus() {
-    uLCD.locate(10, 0);
+    uLCD.locate(11, 0);
     uLCD.color(WHITE);
     if (isPaused) {
         uLCD.printf("Paused ");
@@ -80,7 +80,7 @@ void displayMenu(int selectedIndex) {
     uLCD.color(WHITE);
     uLCD.locate(1, 0);
     uLCD.printf("Select a song:");
-    for (int i = 0; i < std::min((int)tracks.size(), 10); i++) {
+    for (int i = 0; i < std::min((int)tracks.size(), 13); i++) {
         std::string name = tracks[i].substr(tracks[i].find_last_of("/") + 1);
         if (name.length() > 12) name = name.substr(0, 12);
 
