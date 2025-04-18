@@ -139,6 +139,7 @@ void selectTrackMenu() {
         if (!navCenter) {
             currentTrack = selection;
             trackChanged = true;
+            isPaused = false;
             while (!navCenter) ThisThread::sleep_for(20ms);
             break;
         }
