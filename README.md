@@ -8,6 +8,8 @@ and take your music on the go. Features include uLCD display UI, volume control,
 The entire device is built upon a 3D printed breadboard box by Thingiverse user lorddeath.
 https://www.thingiverse.com/thing:4824137/files
 
+The VS1053 operates off the following library from Vassilis Serasidis. https://os.mbed.com/users/silis/code/VS1053/
+
 Usage
 
     Menu Navigation
@@ -41,7 +43,6 @@ Hardware Requirements
 
     Sparkfun MP3 and MIDI Breakout VS1053 (BOB-09943)
         MP3 audio decoder module that communicates over SPI.
-        Uses the following library from Vassilis Serasidis. https://os.mbed.com/users/silis/code/VS1053/
 
     Sparkfun MicroSD card Breakout
 
