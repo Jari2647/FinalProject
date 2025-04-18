@@ -80,7 +80,7 @@ void displayMenu(int selectedIndex) {
     uLCD.color(WHITE);
     uLCD.locate(1, 0);
     uLCD.printf("Select a song:");
-    for (int i = 0; i < std::min((int)tracks.size(), 5); i++) {
+    for (int i = 0; i < std::min((int)tracks.size(), 10); i++) {
         std::string name = tracks[i].substr(tracks[i].find_last_of("/") + 1);
         if (name.length() > 12) name = name.substr(0, 12);
 
