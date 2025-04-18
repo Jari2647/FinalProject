@@ -36,6 +36,7 @@ const int BAR_WIDTH = 128;
 const int BAR_HEIGHT = 4;
 const int BAR_Y = 72;
 const int BITRATE_BYTES_PER_SEC = 16000;
+static const int ITEMS_PER_PAGE = 12;  // number of songs per page in menu
 
 // === UI Utilities ===
 void drawProgressBar(float percent) {
@@ -74,17 +75,23 @@ void displayTrackTitle(const std::string& path) {
     updatePlayPauseStatus();
 }
 
-// === Menu ===
+// === Menu with Paging ===
 void displayMenu(int selectedIndex) {
     uLCD.cls();
     uLCD.color(WHITE);
     uLCD.locate(1, 0);
     uLCD.printf("Select a song:");
-    for (int i = 0; i < std::min((int)tracks.size(), 13); i++) {
+
+    int page = selectedIndex / ITEMS_PER_PAGE;
+    int start = page * ITEMS_PER_PAGE;
+    int end = std::min(start + ITEMS_PER_PAGE, (int)tracks.size());
+
+    for (int i = start; i < end; i++) {
         std::string name = tracks[i].substr(tracks[i].find_last_of("/") + 1);
         if (name.length() > 12) name = name.substr(0, 12);
 
-        uLCD.locate(1, i + 2);
+        int row = (i - start) + 2;  // first entry at row 2
+        uLCD.locate(1, row);
         if (i == selectedIndex) {
             uLCD.color(GREEN);
             uLCD.printf("> %s", name.c_str());
@@ -93,6 +100,12 @@ void displayMenu(int selectedIndex) {
             uLCD.printf("  %s", name.c_str());
         }
     }
+
+    // Optional page indicator at bottom
+    int totalPages = (tracks.size() + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE;
+    uLCD.locate(0, 15);
+    uLCD.color(WHITE);
+    uLCD.printf("Page %d/%d", page + 1, totalPages);
 }
 
 void selectTrackMenu() {
@@ -175,7 +188,7 @@ void playCurrentTrack() {
     uint32_t counter = 0;
 
     while (true) {
-        // Return to menu if menu button is pressed
+        // Return to menu
         if (!menuButton) {
             ThisThread::sleep_for(200ms);
             fclose(file);
@@ -187,7 +200,7 @@ void playCurrentTrack() {
             break;
         }
 
-        // Toggle play/pause with center button
+        // Pause/Resume
         if (!navCenter) {
             ThisThread::sleep_for(200ms);
             isPaused = !isPaused;
@@ -197,7 +210,7 @@ void playCurrentTrack() {
         }
 
         if (!isPaused) {
-            // Handle next/prev during playback
+            // Skip tracks
             if (!navRight) {
                 ThisThread::sleep_for(200ms);
                 currentTrack = (currentTrack + 1) % tracks.size();
@@ -243,7 +256,6 @@ int main() {
         return 1;
     }
 
-    // Only show menu once at the beginning
     selectTrackMenu();
 
     while (true) {
