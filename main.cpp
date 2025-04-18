@@ -231,6 +231,7 @@ void playCurrentTrack() {
             ThisThread::sleep_for(200ms);
             isPaused = !isPaused;
             resumePosition = ftell(file);
+            updatePlayPauseStatus();
             while (!navCenter) ThisThread::sleep_for(50ms);
         }
 
