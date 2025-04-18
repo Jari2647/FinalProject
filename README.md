@@ -2,7 +2,7 @@
 Walkman-style mp3 player created with Mbed LPC1768 microcontroller. Written in C++.
 Version: MBED OS6
 
-This portable device plays mp3 audio files off of a 32GB micro-sd card. Connect your listening device of choice through the integrated 3.5mm audio jack
+This portable device plays mp3 audio files off of a 32GB MicroSD card. Connect your listening device of choice through the integrated 3.5mm audio jack
 and take your music on the go. Features include uLCD display UI, volume control, on-device menu navigation, and volume control. 
 
 The entire device is built upon a 3D printed breadboard box by Thingiverse user lorddeath.
