@@ -41,17 +41,17 @@ Hardware Requirements
 
     Mbed LPC1768 microcontroller
 
-    Sparkfun MP3 and MIDI Breakout VS1053 (BOB-09943)
-        MP3 audio decoder module that communicates over SPI.
-
-    Sparkfun MicroSD card Breakout
+    4D Systems uLCD (serial interface)
 
     MicroSD card formatted with FAT32 filesystem
 
+    Sparkfun MicroSD card Breakout
+
+    Sparkfun MP3 and MIDI Breakout VS1053 (BOB-09943)
+        MP3 audio decoder module that communicates over SPI.
+
     Sparkfun TRRS breakout
         3.5mm audio jack
-
-    4D Systems uLCD (serial interface)
 
     5 way tactile Nav Switch
         UI control: Song selection in menu and playback.
