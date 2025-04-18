@@ -222,9 +222,7 @@ void playCurrentTrack() {
             fclose(file);
             while (!menuButton) ThisThread::sleep_for(20ms);
             selectTrackMenu();
-            displayTrackTitle(tracks[currentTrack]);
             resumePosition = 0;
-            updatePlayPauseStatus();
             break;
         }
 
@@ -233,7 +231,6 @@ void playCurrentTrack() {
             ThisThread::sleep_for(200ms);
             isPaused = !isPaused;
             resumePosition = ftell(file);
-            updatePlayPauseStatus();
             while (!navCenter) ThisThread::sleep_for(50ms);
         }
 
@@ -302,6 +299,7 @@ int main() {
             audio.modeSwitch();
             audio.clockUp();
             displayTrackTitle(tracks[currentTrack]);
+            updatePlayPauseStatus();  
             resumePosition = 0;
             trackChanged = false;
         }
