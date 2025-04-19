@@ -10,6 +10,9 @@ https://www.thingiverse.com/thing:4824137/files
 
 The VS1053 operates off the following library from Vassilis Serasidis. https://os.mbed.com/users/silis/code/VS1053/
 
+![IMG_0257](https://github.com/user-attachments/assets/d50fe24e-eb86-4c68-906d-330137ddd846)
+![IMG_0258](https://github.com/user-attachments/assets/28f80b61-4a9d-45fb-ad6e-b66a6a9f1e81)
+
 Usage
 
     Menu Navigation
@@ -54,10 +57,12 @@ Hardware Requirements
         3.5mm audio jack
 
     5 way tactile Nav Switch
-        UI control: Song selection in menu and playback.
+        UI control: S![IMG_0257](https://github.com/user-attachments/assets/a63963e1-cb00-49f9-a811-3c3a93c1f3c0)
+ong selection in menu and playback.
 
     1 pushbutton
-        UI control: Returns to song selection menu.
+      ![IMG_0257](https://github.com/user-attachments/assets/3a62ddc6-d1d8-4270-ae5c-bbe1becd415d)
+  UI control: Returns to song selection menu.
 
     10 kΩ potentiometer
         Volume control
