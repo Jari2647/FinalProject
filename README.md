@@ -57,12 +57,10 @@ Hardware Requirements
         3.5mm audio jack
 
     5 way tactile Nav Switch
-        UI control: S![IMG_0257](https://github.com/user-attachments/assets/a63963e1-cb00-49f9-a811-3c3a93c1f3c0)
-ong selection in menu and playback.
+        UI control: Song selection in menu and playback.
 
     1 pushbutton
-      ![IMG_0257](https://github.com/user-attachments/assets/3a62ddc6-d1d8-4270-ae5c-bbe1becd415d)
-  UI control: Returns to song selection menu.
+      UI control: Returns to song selection menu.
 
     10 kΩ potentiometer
         Volume control
