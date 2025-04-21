@@ -5,7 +5,7 @@ Version: MBED OS6
 This portable device plays mp3 audio files off of a 32GB MicroSD card. Connect your listening device of choice through the integrated 3.5mm audio jack
 and take your music on the go. Features include uLCD display UI, volume control, on-device menu navigation, and volume control. 
 
-The entire device is built upon a 3D printed breadboard box by Thingiverse user lorddeath.
+The device is built upon a 3D printed breadboard box by Thingiverse user lorddeath.
 https://www.thingiverse.com/thing:4824137/files
 
 The VS1053 operates off the following library from Vassilis Serasidis. https://os.mbed.com/users/silis/code/VS1053/
