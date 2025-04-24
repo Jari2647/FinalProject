@@ -17,10 +17,10 @@ uLCD_4DGL uLCD(p28, p27, p20);  // TX, RX, RESET
 
 // User Controls
 AnalogIn volumeKnob(p19);
-DigitalIn navRight(p29, PullUp);   // Next track
-DigitalIn navLeft(p26, PullUp);    // Previous track
 DigitalIn navUp(p24, PullUp);      // Menu up
 DigitalIn navDown(p25, PullUp);    // Menu down
+DigitalIn navLeft(p26, PullUp);    // Previous track
+DigitalIn navRight(p29, PullUp);   // Next track
 DigitalIn navCenter(p30, PullUp);  // Menu select + Play/Pause
 DigitalIn menuButton(p21, PullUp); // Dedicated button to return to menu
 
@@ -33,10 +33,10 @@ bool isPaused = false;
 uint32_t resumePosition = 0;
 
 // Constants for progress bar and song menu pages
+// change these for ulcd debugging
 const int BAR_WIDTH = 128;
 const int BAR_HEIGHT = 4;
 const int BAR_Y = 72;
-const int BITRATE_BYTES_PER_SEC = 16000;
 static const int ITEMS_PER_PAGE = 10;  // number of songs per page in menu
 
 // Repeatedly called progress bar function
@@ -68,7 +68,10 @@ void updatePlayPauseStatus() {
 void displayTrackTitle(const std::string& path) {
     uLCD.cls();
     std::string title = path.substr(path.find_last_of("/") + 1);
-    if (title.length() > 20) title = title.substr(0, 20);
+    if (title.length() > 20) {
+        title = title.substr(0, 20);
+    }
+    // fit the song title on the center of the screen
     int xPos = std::max(0, 8 - static_cast<int>(title.length() / 2));
     uLCD.locate(xPos, 6);
     uLCD.color(WHITE);
@@ -94,8 +97,9 @@ void displayMenu(int selectedIndex) {
 
     for (int i = start; i < end; i++) {
         std::string name = tracks[i].substr(tracks[i].find_last_of("/") + 1);
-        if (name.length() > 12) name = name.substr(0, 12);
-
+        if (name.length() > 12){ 
+            name = name.substr(0, 12);
+        }
         int row = (i - start) + 2;  // first entry at row 2
         uLCD.locate(1, row);
         // Highlight the selected song in green, every other song in white
@@ -191,10 +195,14 @@ void initializePlayer() {
 
 // Playback
 void playCurrentTrack() {
-    if (tracks.empty()) return;
+    if (tracks.empty()) {
+        return;
+    }
 
     FILE *file = fopen(tracks[currentTrack].c_str(), "rb");
-    if (!file) return;
+    if (!file) {
+        return;
+    }
 
     // File seek functionality with SDBlockDevice API
     // It lets us keep track of which chunk of the song we're in
@@ -255,7 +263,9 @@ void playCurrentTrack() {
             }
             // This is where we fill the buffer with song data
             bytesRead = fread(buffer, 1, sizeof(buffer), file);
-            if (bytesRead == 0) break;
+            if (bytesRead == 0) {
+                break;
+            }
             // Send the song data to the VS1053 for decoding
             audio.sendDataBlock(buffer, bytesRead);
         }
@@ -276,7 +286,9 @@ void playCurrentTrack() {
     // Close the current song file
     fclose(file);
     // Reset the track position to the beginning when a new song starts.
-    if (!trackChanged) resumePosition = 0;
+    if (!trackChanged) {
+        resumePosition = 0;
+    }
 }
 
 // The main program
