@@ -8,6 +8,9 @@ and take your music on the go. Features include uLCD display UI, volume control,
 The device is built upon a 3D printed breadboard box by Thingiverse user lorddeath.
 https://www.thingiverse.com/thing:4824137/files
 
+The uLCD display operates off of a library written by Stephane Rochon. It was provided
+to us in ECE2035 HW3.
+
 The VS1053 operates off the following library from Vassilis Serasidis. https://os.mbed.com/users/silis/code/VS1053/
 
 ![IMG_0257](https://github.com/user-attachments/assets/d50fe24e-eb86-4c68-906d-330137ddd846)
