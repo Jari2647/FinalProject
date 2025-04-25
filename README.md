@@ -76,9 +76,7 @@ Hardware Requirements
         This project uses 4 AA batteries in series with a barrel jack adapter.
         Shared between LPC1768, VS1053, uLCD, and MicroSD card breakout.
 
-
-![FinalProject](https://github.com/user-attachments/assets/0c8aa452-e543-4b4a-a88e-e977982b91fb)
-
+![image](https://github.com/user-attachments/assets/4dcfb9d6-2b13-4b71-b475-804519e86397)
 
 
 Issues
