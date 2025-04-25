@@ -9,6 +9,7 @@ The MicroSD card is accessed through the SDBlockDevice API in Mbed OS6.
 
 The device is built upon a 3D printed breadboard box by Thingiverse user lorddeath.
 https://www.thingiverse.com/thing:4824137/files
+![large_display_Box_2](https://github.com/user-attachments/assets/d55376af-1e8e-428b-b894-258cfe231380)
 
 The uLCD display operates off of a library written by Stephane Rochon and modified by Jim Hamblen on the Mbed forums. https://os.mbed.com/users/4180_1/code/uLCD144G2_demo/diff/31e63caf37e2/main.cpp/
 
