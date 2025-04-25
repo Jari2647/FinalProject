@@ -7,6 +7,8 @@ and take your music on the go. Features include uLCD display UI, volume control,
 
 The MicroSD card is accessed through the SDBlockDevice API in Mbed OS6.
 
+The MicroSD card is read by FATFileSystem API in Mbed OS6.
+
 The device is built upon a 3D printed breadboard box by Thingiverse user lorddeath.
 https://www.thingiverse.com/thing:4824137/files
 ![image](https://github.com/user-attachments/assets/0f36474b-651d-4516-93ad-d121b58af7b8)
