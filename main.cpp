@@ -10,8 +10,8 @@
 #include <algorithm> // for min and max functions
 
 // Pinouts
-VS1053 audio(p11, p12, p13, p14, p15, p16, p17);
-SDBlockDevice sd(p5, p6, p7, p8);
+VS1053 audio(p11, p12, p13, p14, p15, p16, p17); // mosi, miso, sck, cs, bsync, dreq, rst
+SDBlockDevice sd(p5, p6, p7, p8); // mosi, miso, sclk, cs
 FATFileSystem fs("sd");
 uLCD_4DGL uLCD(p28, p27, p20);  // TX, RX, RESET
 
